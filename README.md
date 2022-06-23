@@ -4,6 +4,11 @@ This ETL process processes data on tax transactions.
 We take the initial dataframe (taxTransactionDf) and apply filter rules which are stored in another dataframe. 
 Each rule should be applied to the initial dataframe in parallel and then they should be united into one final dataframe
 
+Here is schema of ETL 
+
+![rules](https://user-images.githubusercontent.com/79256653/175340815-cb5d8c60-ca69-4c47-a2fb-b934a5b8649f.png)
+
+
 Inside you can find the next objects and classes:
 
 1.0 srs/main/scala
