@@ -109,6 +109,7 @@ class AutoKNUProcessor  (startDate: String,
         case Some(cond) => Option(if (pattern.account_mask_rule == Include) cond else not(cond))
       }
 
+
     val paymentCondition = createCondition(PaymentPurpose, pattern.payment_purpose_pattern_list) match {
       case None => None
       case Some(cond) => Option(if (pattern.payment_purpose_rule == Include) cond else not(cond))
