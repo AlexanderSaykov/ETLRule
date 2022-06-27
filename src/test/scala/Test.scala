@@ -1,6 +1,4 @@
-import DataSourses.{autoKnuRules, incomeExpenseItemDf, spark, taxTransactionDf}
-import Schemas.{taxTransactionAutoTaxItemPattern, taxTransactionRnu45}
-import org.apache.spark.sql.DataFrame
+import DataSourses.{autoKnuRules, incomeExpenseItemDf, taxTransactionDf}
 import org.apache.spark.sql.functions.col
 import org.scalatest.funsuite.AnyFunSuite
 

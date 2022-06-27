@@ -74,7 +74,7 @@ class AutoKNUProcessor  (startDate: String,
    */
 
   def dropDuplicatesKnu(column: String, df: DataFrame) = {
-    val windowSpec = Window.partitionBy(ID_PK).orderBy(col("rule").asc)
+    val windowSpec = Window.partitionBy(IdpK).orderBy(col("rule").asc)
     df.filter(col(column).isNotNull)
       .withColumn("rule", when(col(column) === "30000" || col(column) === "50000", 1).otherwise(2))
       .withColumn("rank", row_number.over(windowSpec))
@@ -92,26 +92,26 @@ class AutoKNUProcessor  (startDate: String,
 
     val ofrCondition =
       Seq(
-        createCondition(DT_TAX_ITEM_OFR, pattern.dt_tax_item_ofr_list),
-        createCondition(KT_TAX_ITEM_OFR, pattern.kt_tax_item_ofr_list)
+        createCondition(DtTaxItemOfr, pattern.dt_tax_item_ofr_list),
+        createCondition(KtTaxItemOfr, pattern.kt_tax_item_ofr_list)
       )
         .flatten
         .reduceOption(_ && _)
 
     val accountCondition =
       Seq(
-        createCondition(DT_ACCOUNT, pattern.dt_account_mask_list),
-        createCondition(KT_ACCOUNT, pattern.kt_account_mask_list)
+        createCondition(DtAccount, pattern.dt_account_mask_list),
+        createCondition(KtAccount, pattern.kt_account_mask_list)
       )
         .flatten
         .reduceOption(_ && _) match {
         case None => None
-        case Some(cond) => Option(if (pattern.account_mask_rule == INCLUDE) cond else not(cond))
+        case Some(cond) => Option(if (pattern.account_mask_rule == Include) cond else not(cond))
       }
 
-    val paymentCondition = createCondition(PAYMENT_PURPOSE, pattern.payment_purpose_pattern_list) match {
+    val paymentCondition = createCondition(PaymentPurpose, pattern.payment_purpose_pattern_list) match {
       case None => None
-      case Some(cond) => Option(if (pattern.payment_purpose_rule == INCLUDE) cond else not(cond))
+      case Some(cond) => Option(if (pattern.payment_purpose_rule == Include) cond else not(cond))
     }
 
     Seq(
@@ -152,21 +152,21 @@ class AutoKNUProcessor  (startDate: String,
 
   def checkPattern(column: String): DataFrame = {
 
-    val tax_item = if (column == DT_TAX_ITEM_OFR_LIST) DT_TAX_ITEM
-    else KT_TAX_ITEM
+    val tax_item = if (column == DtTaxItemOfrList) DtTaxItem
+    else KtTaxItem
 
     val check = autoTaxItemRules
       .filter(!col(column).rlike("[%?]"))
       .filter(col(column) =!= "" && col(column).isNotNull)
-      .join(incomeExpenseItemDf.select(TAX_ITEM_OFR, TAX_ITEM_CODE, ACTUAL_FROM, ACTUAL_TO), autoTaxItemRules(column) === incomeExpenseItemDf(TAX_ITEM_OFR), "inner")
+      .join(incomeExpenseItemDf.select(TaxItemOfr, TaxItemCode, ActualFrom, ActualTo), autoTaxItemRules(column) === incomeExpenseItemDf(TaxItemOfr), "inner")
       .dropDuplicates()
-      .filter(col(tax_item) === col(TAX_ITEM_CODE))
-      .withColumn(END_DATE, least(col(END_DATE), lit(endDate).cast(DateType)))
-      .filter(col(ACTUAL_FROM) <= col(END_DATE) && (col(ACTUAL_TO) >= col(END_DATE) || col(ACTUAL_TO).isNull))
-      .select(ID_PK).map(f => f.getLong(0)).collect.toList
+      .filter(col(tax_item) === col(TaxItemCode))
+      .withColumn(EndDate, least(col(EndDate), lit(endDate).cast(DateType)))
+      .filter(col(ActualFrom) <= col(EndDate) && (col(ActualTo) >= col(EndDate) || col(ActualTo).isNull))
+      .select(IdpK).map(f => f.getLong(0)).collect.toList
 
     autoTaxItemRules
-      .filter(col(ID_PK).isin(check: _*))
+      .filter(col(IdpK).isin(check: _*))
       .union(autoTaxItemRules.filter(col(tax_item) === 30000 || col(tax_item) === 50000))
   }
 
@@ -182,9 +182,9 @@ class AutoKNUProcessor  (startDate: String,
       logger.warn("[TECH] Table tax_transaction_auto_tax_item_pattern is empty. Nothing will be written into T_auto")
       spark.createDataFrame(spark.sparkContext.emptyRDD[Row], taxTransactionRnu45AutoTaxItemCorrection)
     } else {
-      val autoKnuRulesAfterCheck = checkPattern(DT_TAX_ITEM_OFR_LIST).union(checkPattern(KT_TAX_ITEM_OFR_LIST))
+      val autoKnuRulesAfterCheck = checkPattern(DtTaxItemOfrList).union(checkPattern(KtTaxItemOfrList))
 
-      logger.warn(s"[TECH] TaxItemRules table is checked. ids of applied rules are ${autoKnuRulesAfterCheck.select(ID_PK).map(f => f.getLong(0)).collect.toList.sorted}")
+      logger.warn(s"[TECH] TaxItemRules table is checked. ids of applied rules are ${autoKnuRulesAfterCheck.select(IdpK).map(f => f.getLong(0)).collect.toList.sorted}")
 
       val autoKnuRules: Array[AutoKnuRule] = autoKnuRulesAfterCheck.as[AutoKnuRule].collect()
 
@@ -193,23 +193,23 @@ class AutoKNUProcessor  (startDate: String,
         .map(taxTransactionDf.filter)
         .zip(autoKnuRules)
         .map { case (x: DataFrame, y: AutoKnuRule) => x
-          .filter(to_date(col(OPERATION_DATE), DATE_FMT_PATTERN) <= getEndUsage(y) &&
-            to_date(col(OPERATION_DATE), DATE_FMT_PATTERN) >= getBeginUsage(y))
-          .withColumn(DT_TAX_ITEM, when(x.col(DT_ACCOUNT).like("7%"), lit(y.dt_tax_item)))
-          .withColumn(KT_TAX_ITEM, when(x.col(KT_ACCOUNT).like("7%"), lit(y.kt_tax_item)))
+          .filter(to_date(col(OperationDate), DateFmtPattern) <= getEndUsage(y) &&
+            to_date(col(OperationDate), DateFmtPattern) >= getBeginUsage(y))
+          .withColumn(DtTaxItem, when(x.col(DtAccount).like("7%"), lit(y.dt_tax_item)))
+          .withColumn(KtTaxItem, when(x.col(KtAccount).like("7%"), lit(y.kt_tax_item)))
         }
         .reduce(_ union _)
-        .withColumn(KT_TAX_ITEM, when(col(KT_TAX_ITEM) === "", null).otherwise(col(KT_TAX_ITEM)))
-        .withColumn(DT_TAX_ITEM, when(col(DT_TAX_ITEM) === "", null).otherwise(col(DT_TAX_ITEM)))
+        .withColumn(KtTaxItem, when(col(KtTaxItem) === "", null).otherwise(col(KtTaxItem)))
+        .withColumn(DtTaxItem, when(col(DtTaxItem) === "", null).otherwise(col(DtTaxItem)))
 
-      val finalReport = dropDuplicatesKnu(KT_TAX_ITEM, filteredTransactionsDf).union(dropDuplicatesKnu(DT_TAX_ITEM, filteredTransactionsDf))
-        .withColumn(CREATED_TS, current_timestamp().as(CREATED_TS))
-        .select(col(ID_PK),
-          to_date(col(INPUT_DT), DATE_FMT_PATTERN).as(INPUT_DT),
-          col(DT_TAX_ITEM).as(DT_TAX_ITEM_AUTO),
-          col(KT_TAX_ITEM).as(KT_TAX_ITEM_AUTO),
-          col(OPERATION_DATE),
-          col(CREATED_TS))
+      val finalReport = dropDuplicatesKnu(KtTaxItem, filteredTransactionsDf).union(dropDuplicatesKnu(DtTaxItem, filteredTransactionsDf))
+        .withColumn(CreatedTs, current_timestamp().as(CreatedTs))
+        .select(col(IdpK),
+          to_date(col(InputDt), DateFmtPattern).as(InputDt),
+          col(DtTaxItem).as(DtTaxItemAuto),
+          col(KtTaxItem).as(KtTaxItemAuto),
+          col(OperationDate),
+          col(CreatedTs))
 
       /**
        * according to business logic there should not be empty DT_TAX_ITEM_AUTO
@@ -221,15 +221,15 @@ class AutoKNUProcessor  (startDate: String,
 
 
       def taxItemAggregation(column: String) = {
-        finalReport.groupBy(ID_PK).agg(max(column).as(column))
+        finalReport.groupBy(IdpK).agg(max(column).as(column))
       }
 
-      val finalReportDtAgg = taxItemAggregation(DT_TAX_ITEM_AUTO)
-      val finalReportKtAgg = taxItemAggregation(KT_TAX_ITEM_AUTO)
+      val finalReportDtAgg = taxItemAggregation(DtTaxItemAuto)
+      val finalReportKtAgg = taxItemAggregation(KtTaxItemAuto)
 
-      val joinedTables = finalReportDtAgg.join(finalReportKtAgg, Seq(ID_PK), "inner")
+      val joinedTables = finalReportDtAgg.join(finalReportKtAgg, Seq(IdpK), "inner")
 
-      finalReport.drop(DT_TAX_ITEM_AUTO, KT_TAX_ITEM_AUTO).join(joinedTables, Seq(ID_PK), "inner").dropDuplicates()
+      finalReport.drop(DtTaxItemAuto, KtTaxItemAuto).join(joinedTables, Seq(IdpK), "inner").dropDuplicates()
     }
   }
 }
